@@ -24,10 +24,13 @@ typedef struct {
 } mactable_t;
 
 typedef enum { UNUSED = 0, BOOL = 1, BYTE = 2, INT = 3, FLOAT = 4, STRING = 5 } registertype_t;
+typedef enum { READONLY = 0, READWRITE = 1 } registeraccess_t;
 
 typedef struct {
   char name[REGISTER_NAME_LENGTH];
   registertype_t type;
+  registeraccess_t access;
+  
   boolean boolValue;
   uint8_t byteValue;
   int32_t intValue;
@@ -46,9 +49,17 @@ void printRegisters();
 void handleSerialMsg(String& msg);
 void registerHandleSerialKeyValue(callback_kv_t callback);
 void registerHandleSerialCmd(callback_cmd_t callback);
-void createRegister(char name[REGISTER_NAME_LENGTH], registertype_t type);
-register_t * getRegister(char name[REGISTER_NAME_LENGTH]);
+void createRegister(String name, registertype_t type, registeraccess_t access);
+void createRegister(const char name[REGISTER_NAME_LENGTH], registertype_t type, registeraccess_t access);
+register_t * getRegister(String name);
+register_t * getRegister(const char name[REGISTER_NAME_LENGTH]);
+String registerGetValue(register_t* reg, boolean quoteString);
+void registerSetValue(register_t* reg, String value);
 uint8_t registerHash(register_t reg);
+registertype_t registerType(String regType);
+String registerType(registertype_t regType);
+registeraccess_t registerAccess(String regAccess);
+String registerAccess(registeraccess_t regAccess);
 void printMacTable();
 boolean startWiFi();
 void wifiStatus();

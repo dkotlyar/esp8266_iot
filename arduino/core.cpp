@@ -113,13 +113,7 @@ void printRegisters() {
         Serial.print("?register:");
         Serial.print(registerBuffer[i].name);
         Serial.print("=");
-        switch (registerBuffer[i].type) {
-          case BOOL: Serial.println(registerBuffer[i].boolValue); break;
-          case BYTE: Serial.println(registerBuffer[i].byteValue); break;
-          case INT: Serial.println(registerBuffer[i].intValue); break;
-          case FLOAT: Serial.println(registerBuffer[i].floatValue); break;
-          case STRING: Serial.println(registerBuffer[i].stringValue); break;
-        }
+        Serial.println(registerGetValue(&registerBuffer[i], true));
         registerBuffer[i].hash = hash;
       }
     }
@@ -141,6 +135,32 @@ void handleSerialMsg(String& msg) {
       value.toCharArray(password, 50);
     } else if (key == "wifimode") {
       changeWifiMode(value);
+    } else if (key.startsWith("register:")) {
+      String regName = key.substring(key.indexOf(":")+1);
+      register_t* reg = getRegister(regName);
+      if (reg != NULL) {
+        registerSetValue(reg, value);
+        reg->hash = registerHash(*reg);
+        Serial.print(key);
+        Serial.print("=");
+        Serial.print(value);
+        Serial.println(" OK");
+      } else {
+        Serial.println("Unknown register");
+      }
+    } else if (key == "newregister") {
+      String regName = value.substring(0, value.indexOf(":"));
+      value = value.substring(value.indexOf(":") + 1);
+      String regType = value.substring(0, value.indexOf(":"));
+      String regAccess = value.substring(value.indexOf(":") + 1);
+      createRegister(regName, registerType(regType), registerAccess(regAccess));
+      register_t* newReg = getRegister(regName);
+      Serial.print("Register created with name \"");
+      Serial.print(newReg->name);
+      Serial.print("\", type=");
+      Serial.print(registerType(newReg->type));
+      Serial.print(", access=");
+      Serial.println(registerAccess(newReg->access));
     }
     else {
       if (userSerialKeyValueCallback != NULL)
@@ -180,17 +200,26 @@ void registerHandleSerialCmd(callback_cmd_t callback) {
   userSerialCommandCallback = callback;
 }
 
-void createRegister(char name[REGISTER_NAME_LENGTH], registertype_t type) {
+void createRegister(String name, registertype_t type, registeraccess_t access) {
+  createRegister(name.c_str(), type, access);
+}
+
+void createRegister(const char name[REGISTER_NAME_LENGTH], registertype_t type, registeraccess_t access) {
   for (int i = 0; i < REGISTER_COUNT; i++) {
     if (registerBuffer[i].type == UNUSED) {
       memcpy(registerBuffer[i].name, name, REGISTER_NAME_LENGTH);
       registerBuffer[i].type = type;
+      registerBuffer[i].access = access;
       return;
     }
   }
 }
 
-register_t * getRegister(char name[REGISTER_NAME_LENGTH]) {
+register_t * getRegister(String name) {
+  return getRegister(name.c_str());
+}
+
+register_t * getRegister(const char name[REGISTER_NAME_LENGTH]) {
   for (int i = 0; i < REGISTER_COUNT; i++) {
     if (strcmp(registerBuffer[i].name, name) == 0) {
       return &registerBuffer[i];
@@ -198,6 +227,36 @@ register_t * getRegister(char name[REGISTER_NAME_LENGTH]) {
   }
   
   return NULL;
+}
+
+String registerGetValue(register_t* reg, boolean quoteString) {
+  switch(reg->type) {
+    case BOOL: return String(reg->boolValue);
+    case BYTE: return String(reg->byteValue);
+    case INT: return String(reg->intValue);
+    case FLOAT: String(reg->floatValue);
+    case STRING: 
+      if (quoteString)
+        return "\"" + reg->stringValue + "\"";
+      else
+        return reg->stringValue;
+    default: if (quoteString) return "\"\""; else return "";
+  }
+}
+
+void registerSetValue(register_t* reg, String valueStr) {
+  switch(reg->type) {
+    case BOOL:
+      valueStr.toLowerCase();
+      reg->boolValue = (valueStr == "yes" || valueStr == "on" || valueStr == "true" || valueStr == "1");
+      return;
+    case BYTE: reg->byteValue = (uint8_t)valueStr.toInt(); return;
+    case INT: reg->intValue = valueStr.toInt(); return;
+    case FLOAT: reg->floatValue = valueStr.toFloat(); return;
+    case STRING: reg->stringValue = valueStr; return;
+    default: 
+      return;
+  }
 }
 
 uint8_t registerHash(register_t reg) {
@@ -227,6 +286,49 @@ uint8_t registerHash(register_t reg) {
   free(regMem);
 
   return hash;
+}
+
+registertype_t registerType(String regType) {
+  if (regType == "bool") {
+    return BOOL;
+  } else if (regType == "byte") {
+    return BYTE;
+  } else if (regType == "int") {
+    return INT;
+  } else if (regType == "float") {
+    return FLOAT;
+  } else if (regType == "string") {
+    return STRING;
+  } else {
+    return UNUSED;
+  }
+}
+
+String registerType(registertype_t regType) {
+  switch (regType) {
+    case BOOL: return "bool";
+    case BYTE: return "byte";
+    case INT: return "int";
+    case FLOAT: return "float";
+    case STRING: return "string";
+    default: return "unused";
+  }
+}
+
+registeraccess_t registerAccess(String regAccess) {
+  registertype_t access;
+  if (regAccess == "rw" || regAccess == "readwrite" || regAccess == "read-write") {
+    return READWRITE;
+  } else {
+    return READONLY;
+  }
+}
+
+String registerAccess(registeraccess_t regAccess) {
+  switch (regAccess) {
+    case READWRITE: return "read-write";
+    default: return "read-only";
+  }
 }
 
 void printMacTable() {
@@ -414,28 +516,17 @@ void handleKVGet() {
   WiFi.macAddress(selfmac);
 
   if (macEqual(mac, selfmac)) {
-    register_t * reg = getRegister((char*)registerName.c_str());
+    register_t * reg = getRegister(registerName);
     if (reg == NULL) {
-      server.send(200, "application/json", "{\"result\":\"ERR\"}");
+      server.send(200, "application/json", "{\"result\":\"ERR\", \"msg\": \"Register not found\"}");
       return;
     }
     
-    String value;
-    switch(reg->type) {
-      case BOOL: value = String("\"value\":") + reg->boolValue; break;
-      case BYTE: value = String("\"value\":") + reg->byteValue; break;
-      case INT: value = String("\"value\":") + reg->intValue; break;
-      case FLOAT: value = String("\"value\":") + String(reg->floatValue); break;
-      case STRING: value = String("\"value\":\"") + reg->stringValue + "\""; break;
-      default: 
-        server.send(200, "application/json", "{\"result\":\"ERR\"}");
-        return;
-    }
-    
+    String value = registerGetValue(reg, true);
     server.send(200, "application/json",
                 String("{\"result\": \"OK\",") +
                 String("\"register\": \"" + regName + "\", ") +
-                value +
+                String("\"value\":" + value) +
                 String("}")
                );
   } else {
@@ -456,26 +547,16 @@ void handleKVSet() {
   WiFi.macAddress(selfmac);
   
   if (macEqual(mac, selfmac)) {
-    register_t * reg = getRegister((char*)registerName.c_str());
+    register_t * reg = getRegister(registerName);
     if (reg == NULL) {
-      server.send(200, "application/json", "{\"result\":\"ERR\"}");
+      server.send(200, "application/json", "{\"result\":\"ERR\", \"msg\": \"Register not found\"}");
       return;
     }
-    
-    switch(reg->type) {
-      case BOOL:
-        valueStr.toLowerCase();
-        reg->boolValue = (valueStr == "yes" || valueStr == "on" || valueStr == "true" || valueStr == "1");
-        break;
-      case BYTE: reg->byteValue = (uint8_t)valueStr.toInt(); break;
-      case INT: reg->intValue = valueStr.toInt(); break;
-      case FLOAT: reg->floatValue = valueStr.toFloat(); break;
-      case STRING: reg->stringValue = valueStr; break;
-      default: 
-        server.send(200, "application/json", "{\"result\":\"ERR\"}");
-        return;
+    if (reg->access == READONLY) {
+      server.send(200, "application/json", "{\"result\":\"ERR\", \"msg\": \"Register read-only access mode\"}");
     }
-    
+
+    registerSetValue(reg, valueStr);    
     server.send(200, "application/json",
                 String("{\"result\": \"OK\",") +
                 String("\"register\": \"" + regName + "\", ") +
@@ -523,7 +604,7 @@ void handleChangeServer() {
         String("}")
       );
     } else {
-      server.send(200, "application/json", "{\"result\": \"ERR\"}");
+      server.send(200, "application/json", "{\"result\": \"ERR\", \"msg\": \"Low performance\"}");
     }
   } else {
     serverIP = ip;

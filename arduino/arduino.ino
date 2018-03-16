@@ -8,7 +8,7 @@ void setup() {
   registerHandleSerialKeyValue(serialKV);
   registerHandleSerialCmd(serialCmd);
   
-  createRegister("led", BOOL);
+  createRegister("led", BOOL, READWRITE);
   pinMode(LED_PIN, OUTPUT);
 }
 
