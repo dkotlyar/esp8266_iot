@@ -26,15 +26,12 @@ typedef struct {
 
 #define SERIAL_CALLBACK_MAXCOUNT 10
 
-typedef std::function<void(String, String)> SERIAL_CALLBACK_KV;
-typedef std::function<void(String)> SERIAL_CALLBACK_CMD;
-
 void coreSetup();
 void coreLoop();
 void printRegisters();
 void handleSerialMsg(String& msg);
-void registerHandleSerialKeyValue(SERIAL_CALLBACK_KV callback);
-void registerHandleSerialCmd(SERIAL_CALLBACK_CMD callback);
+void registerHandleSerialKeyValue(void(*callback)(String, String));
+void registerHandleSerialCmd(void(*callback)(String));
 void callHandleSerialKeyValue(String k, String v);
 void callHandleSerialCmd(String cmd);
 void createRegister(String name, registertype_t type, registeraccess_t access);

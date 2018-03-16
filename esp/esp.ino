@@ -7,8 +7,8 @@ void setup() {
   coreSetup();
   wifiSetup();
 
-  registerHandleSerialKeyValue(serialKV);
-  registerHandleSerialCmd(serialCmd);
+  registerHandleSerialKeyValue(&serialKV);
+  registerHandleSerialCmd(&serialCmd);
   
   createRegister("led", BOOL, READWRITE);
   pinMode(LED_PIN, OUTPUT);

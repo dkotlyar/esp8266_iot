@@ -3,8 +3,8 @@
 String serialBuffer = "";
 register_t registerBuffer[REGISTER_COUNT];
 
-SERIAL_CALLBACK_KV userSerialKeyValueCallback[SERIAL_CALLBACK_MAXCOUNT];
-SERIAL_CALLBACK_CMD userSerialCommandCallback[SERIAL_CALLBACK_MAXCOUNT];
+void(*userSerialKeyValueCallback[SERIAL_CALLBACK_MAXCOUNT])(String, String);
+void(*userSerialCommandCallback[SERIAL_CALLBACK_MAXCOUNT])(String);
 
 void coreSetup() {
   serialBuffer.reserve(255);
@@ -90,7 +90,7 @@ void handleSerialMsg(String& msg) {
   }
 }
 
-void registerHandleSerialKeyValue(SERIAL_CALLBACK_KV callback) {
+void registerHandleSerialKeyValue(void(*callback)(String, String)) {
   for (int i = 0; i < SERIAL_CALLBACK_MAXCOUNT; i++) {
     if (userSerialKeyValueCallback[i] == NULL) {
       userSerialKeyValueCallback[i] = callback;
@@ -99,7 +99,7 @@ void registerHandleSerialKeyValue(SERIAL_CALLBACK_KV callback) {
   }
 }
 
-void registerHandleSerialCmd(SERIAL_CALLBACK_CMD callback) {
+void registerHandleSerialCmd(void(*callback)(String)) {
   for (int i = 0; i < SERIAL_CALLBACK_MAXCOUNT; i++) {
     if (userSerialCommandCallback[i] == NULL) {
       userSerialCommandCallback[i] = callback;

@@ -37,8 +37,8 @@ IPAddress broadcastIP;
 DynamicJsonBuffer jsonBuffer(500);
 
 void wifiSetup() {
-  registerHandleSerialKeyValue(wifiSerialKeyValue);
-  registerHandleSerialCmd(wifiSerialCmd);
+  registerHandleSerialKeyValue(&wifiSerialKeyValue);
+  registerHandleSerialCmd(&wifiSerialCmd);
   
   EEPROM.begin(512);
 
