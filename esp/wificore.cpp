@@ -69,15 +69,17 @@ void wifiSetup() {
 void wifiLoop() {
   server.handleClient();
 
-  if (scanServer) {
-    doScanServer();
-  }
-  else {
-    if (!isServer) {
-      static uint32_t lastHealthcheck = millis();
-      if (millis() - lastHealthcheck > 30000) {
-        sendHealthcheck();
-        lastHealthcheck = millis();
+  if (wifiConnected()) {
+    if (scanServer) {
+      doScanServer();
+    }
+    else {
+      if (!isServer) {
+        static uint32_t lastHealthcheck = millis();
+        if (millis() - lastHealthcheck > 30000) {
+          sendHealthcheck();
+          lastHealthcheck = millis();
+        }
       }
     }
   }
@@ -109,6 +111,10 @@ void wifiSerialCmd(String cmd) {
   } else if (cmd == "forceserver") {
     setServerMode();
   }
+}
+
+boolean wifiConnected() {
+  return WiFi.localIP() != IPAddress(0,0,0,0);
 }
 
 void printMacTable() {

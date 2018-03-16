@@ -26,6 +26,7 @@ void wifiSetup();
 void wifiLoop();
 void wifiSerialKeyValue(String k, String v);
 void wifiSerialCmd(String cmd);
+boolean wifiConnected();
 void printMacTable();
 boolean startWiFi();
 void wifiStatus();
